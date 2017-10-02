@@ -29,6 +29,7 @@
   var _dist_dir       = _assets_dir + '/dist';
   var _dev_dir        = _assets_dir + '/dev';
   var _build_dir      = (is_prod) ? _dist_dir : _dev_dir;
+  var _bower_dir      = './bower_components';
 
 
   /**
@@ -51,6 +52,43 @@
 
 
   /**
+   * Lints the gulpfile for errors
+   */
+  gulp.task('lint:gulpfile', function() {
+    gulp.src('gulpfile.js')
+      .pipe( $.jshint() )
+      .pipe( $.jshint.reporter('default') )
+      .on( 'error', errorAlert );
+  });
+
+
+  /**
+   * Lints the source js files for errors
+   */
+  gulp.task('lint:src', function() {
+    var _src = [
+      _src_dir + '/js/**/*.js',
+      '!**/libs/**/*.js'
+    ];
+
+    gulp.src(_src)
+      .pipe( $.jshint() )
+      .pipe( $.jshint.reporter('default') )
+      .on( 'error', errorAlert );
+  });
+
+
+  /**
+   * Lints all the js files for errors
+   */
+  gulp.task('lint', [
+    'lint:gulpfile',
+    'lint:src',
+    'lint:sass',
+  ]);
+
+
+  /**
    * Concatenates, minifies and renames the source JS files for dist/dev
    */
   gulp.task('scripts', function() {
@@ -60,11 +98,35 @@
       matches.forEach( function(match) {
         var dir     = match.split('/js/')[1];
         var scripts = [
+          _src_dir + '/js/' + dir + '/libs/**/*.js',
           _src_dir + '/js/' + dir + '/**/*.js'
         ];
+
+        if (dir === 'footer') {
+          // Add any JS from Bower or another location
+          // to this `footer_libs` array to concat it into `footer.js`
+          // eg: _bower_dir + '/responsive-nav/responsive-nav.min.js'
+          var footer_libs = [
+            _bower_dir + '/js-cookie/src/js.cookie.js'
+          ];
+
+          scripts = footer_libs.concat(scripts);
+        }
+
         gulp.src(scripts)
           .pipe( $.plumber({ errorHandler: errorAlert }) )
           .pipe( $.concat(dir + '.js') )
+          .pipe(
+            $.notify({
+              message: 'Before Babel',
+            })
+          )
+          .pipe( $.babel() )
+          .pipe(
+            $.notify({
+              message: 'After Babel',
+            })
+          )
           .pipe( is_prod ? $.uglify() : $.util.noop() )
           .pipe( is_prod ? $.rename(dir + '.min.js') : $.util.noop() )
           .pipe( gulp.dest(_build_dir) )
@@ -72,7 +134,7 @@
           .on( 'error', errorAlert )
           .pipe(
             $.notify({
-              message:  (is_prod) ? dir + ' scripts have been compiled and minified' : dir + ' dev scripts have been compiled',
+              message: dir + ' scripts have been compiled',
               onLast:   true
             })
           );
@@ -119,6 +181,19 @@
           onLast:   true
         })
       );
+  });
+
+
+  /**
+   * Lint the Sass
+   */
+  gulp.task('lint:sass', function() {
+    gulp.src([_src_dir + '/scss/**/*.scss', '!' + _src_dir + '/scss/vendor/*'])
+      .pipe( $.sassLint({
+        'merge-default-rules': true
+      }) )
+      .pipe( $.sassLint.format() )
+      .pipe( $.sassLint.failOnError() );
   });
 
 
