@@ -12,7 +12,6 @@
   const PluginError = require('plugin-error')
   const argv = require('minimist')(process.argv.slice(2))
   const $ = require('gulp-load-plugins')()
-  const postcss = require('gulp-postcss')
   const prefix = require('autoprefixer')
   const cssnano = require('cssnano')
 
@@ -138,7 +137,7 @@
         )
       })
       .pipe(isProd ? $.rename({ suffix: '.min' }) : $.noop())
-      .pipe(postcss(postcssOpts))
+      .pipe($.postcss(postcssOpts))
       .pipe(gulp.dest(buildDir))
       .pipe(reload({stream: true}))
       .on('error', errorAlert)
