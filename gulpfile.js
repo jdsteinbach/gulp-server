@@ -1,82 +1,70 @@
-(function() {
-  'use strict';
+(() => {
+  'use strict'
 
   /**
    * Required node plugins
    */
-  var gulp        = require('gulp');
-  var glob        = require('glob');
-  var del         = require('del');
-  var browserSync = require('browser-sync').create();
-  var reload      = browserSync.reload;
-  var $           = require('gulp-load-plugins')();
-  var postcss     = require('gulp-postcss');
-  var prefix      = require('autoprefixer');
-  var cssnano     = require('cssnano');
-
+  const gulp = require('gulp')
+  const glob = require('glob')
+  const del = require('del')
+  const browserSync = require('browser-sync').create()
+  const reload = browserSync.reload
+  const $ = require('gulp-load-plugins')()
+  const postcss = require('gulp-postcss')
+  const prefix = require('autoprefixer')
+  const cssnano = require('cssnano')
 
   /**
    * Set up prod/dev tasks
    */
-  var is_prod       = !($.util.env.dev);
-
+  const isProd = !($.util.env.dev)
 
   /**
    * Set up file paths
    */
-  var _assets_dir     = './assets';
-  var _src_dir        = _assets_dir + '/src';
-  var _dist_dir       = _assets_dir + '/dist';
-  var _dev_dir        = _assets_dir + '/dev';
-  var _build_dir      = (is_prod) ? _dist_dir : _dev_dir;
-  var _bower_dir      = './bower_components';
-
+  const assetsDir = './assets'
+  const srcDir = `${assetsDir}/src`
+  const scssDir = `${srcDir}/scss`
+  const jsDir = `${srcDir}/js`
+  const buildDir = `${assetsDir}/${(isProd) ? 'dist' : 'dev'}`
 
   /**
    * Error notification settings
    */
-  function errorAlert(err) {
+  function errorAlert (err) {
     $.notify.onError({
-      message:  '<%= error.message %>',
-      sound:    'Sosumi'
-    })(err);
+      message: '<%= error.message %>',
+      sound: 'Sosumi'
+    })(err)
   }
-
 
   /**
    * Clean the dist/dev directories
    */
-  gulp.task('clean', function() {
-    del( _build_dir + '/**/*' );
-  });
-
+  gulp.task('clean', () => del(buildDir + '/**/*'))
 
   /**
    * Lints the gulpfile for errors
    */
-  gulp.task('lint:gulpfile', function() {
+  gulp.task('lint:gulpfile', () =>
     gulp.src('gulpfile.js')
-      .pipe( $.jshint() )
-      .pipe( $.jshint.reporter('default') )
-      .on( 'error', errorAlert );
-  });
-
+      .pipe($.jshint())
+      .pipe($.jshint.reporter('default'))
+      .on('error', errorAlert)
+  )
 
   /**
    * Lints the source js files for errors
    */
-  gulp.task('lint:src', function() {
-    var _src = [
-      _src_dir + '/js/**/*.js',
+  gulp.task('lint:src', () =>
+    gulp.src([
+      `${jsDir}/**/*.js`,
       '!**/libs/**/*.js'
-    ];
-
-    gulp.src(_src)
-      .pipe( $.jshint() )
-      .pipe( $.jshint.reporter('default') )
-      .on( 'error', errorAlert );
-  });
-
+    ])
+      .pipe($.jshint())
+      .pipe($.jshint.reporter('default'))
+      .on('error', errorAlert)
+  )
 
   /**
    * Lints all the js files for errors
@@ -84,147 +72,120 @@
   gulp.task('lint', [
     'lint:gulpfile',
     'lint:src',
-    'lint:sass',
-  ]);
-
+    'lint:sass'
+  ])
 
   /**
    * Concatenates, minifies and renames the source JS files for dist/dev
    */
-  gulp.task('scripts', function() {
-    var matches = glob.sync(_src_dir + '/js/*');
+  gulp.task('scripts', () => {
+    var matches = glob.sync(`${jsDir}/*`)
 
     if (matches.length) {
-      matches.forEach( function(match) {
-        var dir     = match.split('/js/')[1];
+      matches.forEach(function (match) {
+        var dir = match.split('/js/')[1]
         var scripts = [
-          _src_dir + '/js/' + dir + '/libs/**/*.js',
-          _src_dir + '/js/' + dir + '/**/*.js'
-        ];
-
-        if (dir === 'footer') {
-          // Add any JS from Bower or another location
-          // to this `footer_libs` array to concat it into `footer.js`
-          // eg: _bower_dir + '/responsive-nav/responsive-nav.min.js'
-          var footer_libs = [
-            _bower_dir + '/js-cookie/src/js.cookie.js'
-          ];
-
-          scripts = footer_libs.concat(scripts);
-        }
+          `${jsDir}/${dir}/libs/**/*.js`,
+          `${jsDir}/${dir}/**/*.js`
+        ]
 
         gulp.src(scripts)
-          .pipe( $.plumber({ errorHandler: errorAlert }) )
-          .pipe( $.concat(dir + '.js') )
+          .pipe($.plumber({ errorHandler: errorAlert }))
+          .pipe($.concat(`${dir}.js`))
+          .pipe($.babel())
+          .pipe(isProd ? $.uglify() : $.util.noop())
+          .pipe(isProd ? $.rename({ suffix: '.min' }) : $.util.noop())
+          .pipe(gulp.dest(buildDir))
+          .pipe(reload({stream: true}))
+          .on('error', errorAlert)
           .pipe(
             $.notify({
-              message: 'Before Babel',
+              message: `${dir} scripts have been compiled`,
+              onLast: true
             })
           )
-          .pipe( $.babel() )
-          .pipe(
-            $.notify({
-              message: 'After Babel',
-            })
-          )
-          .pipe( is_prod ? $.uglify() : $.util.noop() )
-          .pipe( is_prod ? $.rename(dir + '.min.js') : $.util.noop() )
-          .pipe( gulp.dest(_build_dir) )
-          .pipe( reload({stream:true}) )
-          .on( 'error', errorAlert )
-          .pipe(
-            $.notify({
-              message: dir + ' scripts have been compiled',
-              onLast:   true
-            })
-          );
-      });
+      })
     }
-  });
-
+  })
 
   /**
    * Compiles and compresses the source Sass files for dist/dev
    */
-  gulp.task('styles', function() {
-    var _sass_opts = {
-      outputStyle:  is_prod ? 'compressed' : 'expanded',
-      sourceComments: !is_prod
-    };
+  gulp.task('styles', () => {
+    var sassOpts = {
+      outputStyle: isProd ? 'compressed' : 'expanded'
+    }
 
-    var _postcss_opts = [
+    var postcssOpts = [
       prefix({browsers: ['last 3 versions']})
-    ];
+    ]
 
-    if ( is_prod ) _postcss_opts.push(cssnano());
+    if (isProd) postcssOpts.push(cssnano())
 
-    gulp.src(_src_dir + '/scss/style.scss')
-      .pipe( $.plumber({ errorHandler: errorAlert }) )
-      .pipe( $.sass(_sass_opts) )
-      .on( 'error', function(err) {
-        new $.util.PluginError(
+    return gulp.src(`${scssDir}/style.scss`)
+      .pipe($.plumber({ errorHandler: errorAlert }))
+      .pipe($.sass(sassOpts))
+      .on('error', function (err) {
+        let error = new $.util.PluginError()
+        error(
           'CSS',
           err,
           {
             showStack: true
           }
-        );
+        )
       })
-      .pipe( is_prod ? $.rename({ suffix: '.min' }) : $.util.noop() )
-      .pipe( postcss(_postcss_opts) )
-      .pipe( gulp.dest(_build_dir) )
-      .pipe( reload({stream:true}) )
-      .on( 'error', errorAlert )
+      .pipe(isProd ? $.rename({ suffix: '.min' }) : $.util.noop())
+      .pipe(postcss(postcssOpts))
+      .pipe(gulp.dest(buildDir))
+      .pipe(reload({stream: true}))
+      .on('error', errorAlert)
       .pipe(
         $.notify({
-          message:  (is_prod) ? 'Styles have been compiled and minified' : 'Dev styles have been compiled',
-          onLast:   true
+          message: (isProd) ? 'Styles have been compiled and minified' : 'Dev styles have been compiled',
+          onLast: true
         })
-      );
-  });
-
+      )
+  })
 
   /**
    * Lint the Sass
    */
-  gulp.task('lint:sass', function() {
-    gulp.src([_src_dir + '/scss/**/*.scss', '!' + _src_dir + '/scss/vendor/*'])
-      .pipe( $.sassLint({
+  gulp.task('lint:sass', () =>
+    gulp.src([
+      `${scssDir}/**/*.scss`,
+      `!${scssDir}/vendor/*`
+    ])
+      .pipe($.sassLint({
         'merge-default-rules': true
-      }) )
-      .pipe( $.sassLint.format() )
-      .pipe( $.sassLint.failOnError() );
-  });
-
+      }))
+      .pipe($.sassLint.format())
+      .pipe($.sassLint.failOnError())
+  )
 
   /**
    * Builds for distribution (staging or production)
    */
-  gulp.task('build', [
-    'clean',
-    'styles'
-  ]);
-
+  gulp.task('build', ['clean', 'styles', 'scripts'])
 
   /**
    * Builds assets and reloads the page when any php, html, img or dev files change
    */
-  gulp.task('watch', ['build'], function() {
+  gulp.task('watch', ['build'], () => {
     browserSync.init({
       server: {
         baseDir: './'
       },
       notify: true
-    });
+    })
 
-    gulp.watch( _src_dir + '/scss/**/*', ['styles'] );
-    gulp.watch( _src_dir + '/js/**/*', ['scripts'] );
-    gulp.watch( './**/*.html' ).on('change', reload );
-  });
+    gulp.watch(`${scssDir}/**/*`, ['styles'])
+    gulp.watch(`${jsDir}/**/*`, ['scripts'])
+    gulp.watch('./**/*.{html,php}').on('change', reload)
+  })
 
   /**
    * Backup default task just triggers a build
    */
-  gulp.task('default', [ 'build' ]);
-
-}());
+  gulp.task('default', ['build'])
+})()
