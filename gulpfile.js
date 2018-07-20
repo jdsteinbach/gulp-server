@@ -9,6 +9,7 @@
   const del = require('del')
   const browserSync = require('browser-sync').create()
   const reload = browserSync.reload
+  const PluginError = require('plugin-error')
   const $ = require('gulp-load-plugins')()
   const postcss = require('gulp-postcss')
   const prefix = require('autoprefixer')
@@ -126,7 +127,7 @@
       .pipe($.plumber({ errorHandler: errorAlert }))
       .pipe($.sass(sassOpts))
       .on('error', function (err) {
-        let error = new $.util.PluginError()
+        let error = new PluginError()
         error(
           'CSS',
           err,
