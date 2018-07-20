@@ -29,6 +29,7 @@
     "gulp-sourcemaps": "^2.4.1",
     "gulp-uglify": "^2.0.1",
     "gulp-util": "^3.0.8",
+    "minimist": "^1.2.0",
     "plugin-error": "^1.0.1"
   },
   "repository": "https://github.com/jdsteinbach/gulp-server",

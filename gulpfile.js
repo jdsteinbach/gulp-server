@@ -10,6 +10,7 @@
   const browserSync = require('browser-sync').create()
   const reload = browserSync.reload
   const PluginError = require('plugin-error')
+  const argv = require('minimist')(process.argv.slice(2))
   const $ = require('gulp-load-plugins')()
   const postcss = require('gulp-postcss')
   const prefix = require('autoprefixer')
@@ -18,7 +19,7 @@
   /**
    * Set up prod/dev tasks
    */
-  const isProd = !($.util.env.dev)
+  const isProd = !(argv.dev)
 
   /**
    * Set up file paths
