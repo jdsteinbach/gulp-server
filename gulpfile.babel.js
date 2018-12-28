@@ -1,35 +1,34 @@
-/**
- * Required node plugins
- */
-var gulp = require('gulp')
-var glob = require('glob')
-var del = require('del')
-var browserSync = require('browser-sync').create()
-var reload = browserSync.reload
-var $ = require('gulp-load-plugins')()
-var postcss = require('gulp-postcss')
-var prefix = require('autoprefixer')
-var cssnano = require('cssnano')
+import { dest, series, src, task, watch } from 'gulp'
+import yargs from 'yargs'
+import glob from 'glob'
+import del from 'del'
+import postcss from 'gulp-postcss'
+import prefix from 'autoprefixer'
+import cssnano from 'cssnano'
+
+let browserSync = require('browser-sync').create()
+let { reload } = browserSync
+let $ = require('gulp-load-plugins')()
 
 /**
  * Set up prod/dev tasks
  */
-var isProd = !($.util.env.dev)
+const PROD = !(yargs.argv.dev)
 
 /**
  * Set up file paths
  */
-var _assetsDir = './assets'
-var _srcDir = _assetsDir + '/src'
-var _distDir = _assetsDir + '/dist'
-var _devDir = _assetsDir + '/dev'
-var _buildDir = (isProd) ? _distDir : _devDir
-var _bowerDir = './bower_components'
+const _assetsDir = './assets'
+const _srcDir = _assetsDir + '/src'
+const _distDir = _assetsDir + '/dist'
+const _devDir = _assetsDir + '/dev'
+const _buildDir = (PROD) ? _distDir : _devDir
+const _bowerDir = './bower_components'
 
 /**
  * Error notification settings
  */
-function errorAlert (err) {
+const errorAlert = err => {
   $.notify.onError({
     message: '<%= error.message %>',
     sound: 'Sosumi'
@@ -39,7 +38,7 @@ function errorAlert (err) {
 /**
  * Clean the dist/dev directories
  */
-gulp.task('clean', function (cb) {
+task('clean', function (cb) {
   del(_buildDir + '/**/*')
   cb()
 })
@@ -47,8 +46,8 @@ gulp.task('clean', function (cb) {
 /**
  * Lints the gulpfile for errors
  */
-gulp.task('lint:gulpfile', function () {
-  gulp.src('gulpfile.js')
+task('lint:gulpfile', function () {
+  src('gulpfile.js')
     .pipe($.jshint())
     .pipe($.jshint.reporter('default'))
     .on('error', errorAlert)
@@ -57,13 +56,13 @@ gulp.task('lint:gulpfile', function () {
 /**
  * Lints the source js files for errors
  */
-gulp.task('lint:src', function () {
-  var _src = [
+task('lint:src', function () {
+  let _src = [
     _srcDir + '/js/**/*.js',
     '!**/libs/**/*.js'
   ]
 
-  gulp.src(_src)
+  src(_src)
     .pipe($.jshint())
     .pipe($.jshint.reporter('default'))
     .on('error', errorAlert)
@@ -72,8 +71,8 @@ gulp.task('lint:src', function () {
 /**
  * Lint the Sass
  */
-gulp.task('lint:sass', function () {
-  gulp.src([_srcDir + '/scss/**/*.scss', '!' + _srcDir + '/scss/vendor/*'])
+task('lint:sass', function () {
+  src([_srcDir + '/scss/**/*.scss', '!' + _srcDir + '/scss/vendor/*'])
     .pipe($.sassLint({
       'merge-default-rules': true
     }))
@@ -84,18 +83,18 @@ gulp.task('lint:sass', function () {
 /**
  * Lints all the js files for errors
  */
-gulp.task('lint', gulp.series('lint:gulpfile', 'lint:src', 'lint:sass'))
+task('lint', series('lint:gulpfile', 'lint:src', 'lint:sass'))
 
 /**
  * Concatenates, minifies and renames the source JS files for dist/dev
  */
-gulp.task('scripts', function () {
-  var matches = glob.sync(_srcDir + '/js/*')
+task('scripts', function () {
+  let matches = glob.sync(_srcDir + '/js/*')
 
   if (matches.length) {
     matches.forEach(function (match) {
-      var dir = match.split('/js/')[1]
-      var scripts = [
+      let dir = match.split('/js/')[1]
+      let scripts = [
         _srcDir + '/js/' + dir + '/libs/**/*.js',
         _srcDir + '/js/' + dir + '/**/*.js'
       ]
@@ -104,14 +103,14 @@ gulp.task('scripts', function () {
         // Add any JS from Bower or another location
         // to this `footerLibs` array to concat it into `footer.js`
         // eg: _bowerDir + '/responsive-nav/responsive-nav.min.js'
-        var footerLibs = [
+        let footerLibs = [
           _bowerDir + '/js-cookie/src/js.cookie.js'
         ]
 
         scripts = footerLibs.concat(scripts)
       }
 
-      gulp.src(scripts)
+      src(scripts)
         .pipe($.plumber({ errorHandler: errorAlert }))
         .pipe($.concat(dir + '.js'))
         .pipe(
@@ -125,9 +124,9 @@ gulp.task('scripts', function () {
             message: 'After Babel'
           })
         )
-        .pipe(isProd ? $.uglify() : $.util.noop())
-        .pipe(isProd ? $.rename(dir + '.min.js') : $.util.noop())
-        .pipe(gulp.dest(_buildDir))
+        .pipe(PROD ? $.uglify() : $.util.noop())
+        .pipe(PROD ? $.rename(dir + '.min.js') : $.util.noop())
+        .pipe(dest(_buildDir))
         .pipe(reload({ stream: true }))
         .on('error', errorAlert)
         .pipe(
@@ -143,19 +142,19 @@ gulp.task('scripts', function () {
 /**
  * Compiles and compresses the source Sass files for dist/dev
  */
-gulp.task('styles', function (cb) {
-  var _sassOpts = {
-    outputStyle: isProd ? 'compressed' : 'expanded',
-    sourceComments: !isProd
+task('styles', function (cb) {
+  const _sassOpts = {
+    outputStyle: PROD ? 'compressed' : 'expanded',
+    sourceComments: !PROD
   }
 
-  var _postcssOpts = [
+  const _postcssOpts = [
     prefix({ browsers: ['last 3 versions'] })
   ]
 
-  if (isProd) _postcssOpts.push(cssnano())
+  if (PROD) _postcssOpts.push(cssnano())
 
-  gulp.src(_srcDir + '/scss/style.scss')
+  src(_srcDir + '/scss/style.scss')
     .pipe($.plumber({ errorHandler: errorAlert }))
     .pipe($.sass(_sassOpts))
     .on('error', function (err) {
@@ -167,14 +166,14 @@ gulp.task('styles', function (cb) {
         }
       )
     })
-    .pipe(isProd ? $.rename({ suffix: '.min' }) : $.util.noop())
+    .pipe(PROD ? $.rename({ suffix: '.min' }) : $.util.noop())
     .pipe(postcss(_postcssOpts))
-    .pipe(gulp.dest(_buildDir))
+    .pipe(dest(_buildDir))
     .pipe(reload({ stream: true }))
     .on('error', errorAlert)
     .pipe(
       $.notify({
-        message: (isProd) ? 'Styles have been compiled and minified' : 'Dev styles have been compiled',
+        message: (PROD) ? 'Styles have been compiled and minified' : 'Dev styles have been compiled',
         onLast: true
       })
     )
@@ -184,14 +183,14 @@ gulp.task('styles', function (cb) {
 /**
  * Builds for distribution (staging or production)
  */
-gulp.task('build', gulp.series('clean', 'styles', function (cb) {
+task('build', series('clean', 'styles', function (cb) {
   cb()
 }))
 
 /**
  * Builds assets and reloads the page when any php, html, img or dev files change
  */
-gulp.task('watch', gulp.series('build', function () {
+task('watch:files', series('build', function () {
   browserSync.init({
     server: {
       baseDir: './'
@@ -199,14 +198,14 @@ gulp.task('watch', gulp.series('build', function () {
     notify: true
   })
 
-  gulp.watch(_srcDir + '/scss/**/*', ['styles'])
-  gulp.watch(_srcDir + '/js/**/*', ['scripts'])
-  gulp.watch('./**/*.html').on('change', reload)
+  watch(_srcDir + '/scss/**/*', ['styles'])
+  watch(_srcDir + '/js/**/*', ['scripts'])
+  watch('./**/*.html').on('change', reload)
 }))
 
 /**
  * Backup default task just triggers a build
  */
-gulp.task('default', gulp.series('build', function (cb) {
+task('default', series('build', function (cb) {
   cb()
 }))
