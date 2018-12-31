@@ -1,8 +1,22 @@
 $red: #B71C1C;
 
 body {
-	color: $red;
-	display: grid;
-	transform: rotate(30deg);
-	margin: 1rem;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+p {
+  color: $red;
+  font-size: 40px;
+  font-family: -apple-system, sans-serif;
+  font-weight: bold;
+  transform: rotate(-1deg);
+  margin: 1rem;
+}
+
+.pizza {
+  &::before {
+    content: '🍕 ';
+    display: inline;
+  }
 }

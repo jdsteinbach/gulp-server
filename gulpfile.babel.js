@@ -1,9 +1,7 @@
 import { dest, series, src, task, watch } from 'gulp'
 import yargs from 'yargs'
-import glob from 'glob'
 import del from 'del'
 import babel from 'gulp-babel'
-import concat from 'gulp-concat'
 import gulpif from 'gulp-if'
 import standard from 'gulp-standard'
 import uglify from 'gulp-uglify'
@@ -15,10 +13,12 @@ import sassLint from 'gulp-sass-lint'
 import postcss from 'gulp-postcss'
 import autoprefixer from 'autoprefixer'
 import cssnano from 'cssnano'
-import cssDeclararationSorter from 'css-declaration-sorter'
+import sorter from 'css-declaration-sorter'
 
 let browserSync = require('browser-sync').create()
 let { reload } = browserSync
+
+let { exec } = require('child_process')
 
 /**
  * Set up prod/dev tasks
@@ -29,7 +29,6 @@ const PROD = !(yargs.argv.dev)
  * Set up file paths
  */
 const _assetsDir = './assets'
-const _cleanDir = `${_assetsDir}/**/*`
 const _srcDir = `${_assetsDir}/src`
 const _distDir = `${_assetsDir}/dist`
 const _devDir = `${_assetsDir}/dev`
@@ -50,7 +49,7 @@ const errorAlert = err => {
 /**
  * Clean the dist/dev directories
  */
-task('clean', () => del(_cleanDir))
+task('clean', () => del(_buildDir))
 
 /**
  * Lints the gulpfile for errors
@@ -65,7 +64,7 @@ task('lint:gulpfile', () => {
 /**
  * Lints the source js files for errors
  */
-task('lint:src', () => {
+task('lint:js', () => {
   let _src = [
     `${_srcDir}/js/**/*.js`,
     '!**/libs/**/*.js'
@@ -81,42 +80,51 @@ task('lint:src', () => {
  * Lint the Sass
  */
 task('lint:sass', () => {
-  let _src = [
-    `${_srcDir}/scss/**/*.scss`,
-    `!${_srcDir}/scss/vendor/*`
-  ]
-
-  return src(_src)
+  return src(`${_srcDir}/scss/**/*.scss`)
     .pipe(sassLint({
       'merge-default-rules': true
     }))
     .pipe(sassLint.format())
-    .pipe(sassLint.failOnError())
 })
 
 /**
  * Lints all the js files for errors
  */
-task('lint', series('lint:gulpfile', 'lint:src', 'lint:sass', cb => cb()))
+task('lint', series('lint:gulpfile', 'lint:js', 'lint:sass', cb => cb()))
+
+/*
+ * Fixes standardJS errors in Gulpfile
+ */
+task('standard:gulpfile', () => exec('standard --fix gulpfile.*'))
+
+/*
+ * Fixes standardJS errors in JS files
+ */
+task('standard:js', () => exec(`standard --fix ${_srcDir}/js/**/*.js`))
+
+/**
+ * Fixes all the JS files with standardJS
+ */
+task('standard', series('standard:gulpfile', 'standard:js', cb => cb()))
 
 /**
  * Concatenates, minifies and renames the source JS files for dist/dev
  */
 task('scripts', () => {
   return src(`${_srcDir}/js/*.js`)
-  .pipe(plumber({errorHandler: errorAlert}))
-  .pipe(babel())
-  .pipe(gulpif(PROD, uglify()))
-  .pipe(gulpif(PROD, rename({ suffix: '.min' })))
-  .pipe(dest(_buildDir))
-  .pipe(reload({ stream: true }))
-  .on('error', errorAlert)
-  .pipe(
-    notify({
-      message: `${PROD ? 'Prod' : 'Dev'} scripts have been transpiled${PROD ? ', uglified, and minified' : ''}`,
-      onLast: true
-    })
-  )
+    .pipe(plumber({ errorHandler: errorAlert }))
+    .pipe(babel())
+    .pipe(gulpif(PROD, uglify()))
+    .pipe(gulpif(PROD, rename({ suffix: '.min' })))
+    .pipe(dest(_buildDir))
+    .pipe(reload({ stream: true }))
+    .on('error', errorAlert)
+    .pipe(
+      notify({
+        message: `${PROD ? 'Prod' : 'Dev'} scripts have been transpiled${PROD ? ', uglified, and minified' : ''}`,
+        onLast: true
+      })
+    )
 })
 
 /**
@@ -129,7 +137,7 @@ task('styles', () => {
   }
 
   const _postcssOpts = [
-    cssDeclararationSorter({order:'smacss'}),
+    sorter({ order: 'smacss' }),
     autoprefixer({ grid: true })
   ]
 
@@ -159,7 +167,7 @@ task('build', series('clean', 'styles', 'scripts', cb => cb()))
 /**
  * Builds assets and reloads the page when any php, html, img or dev files change
  */
-task('watch:files', series('build', () => {
+task('watch', series('build', () => {
   browserSync.init({
     server: {
       baseDir: './'
@@ -167,8 +175,8 @@ task('watch:files', series('build', () => {
     notify: true
   })
 
-  watch(`${_srcDir}/scss/**/*`, ['styles'])
-  watch(`${_srcDir}/js/**/*`, ['scripts'])
+  watch(`${_srcDir}/scss/**/*`, series('styles'))
+  watch(`${_srcDir}/js/**/*`, series('scripts'))
   watch('./**/*.html').on('change', reload)
 }))
 
