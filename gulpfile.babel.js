@@ -1,8 +1,11 @@
 import { dest, series, src, task, watch } from 'gulp'
 import yargs from 'yargs'
 import del from 'del'
-import babel from 'gulp-babel'
+import babel from 'rollup-plugin-babel'
+import resolve from 'rollup-plugin-node-resolve'
+import common from 'rollup-plugin-commonjs'
 import gulpif from 'gulp-if'
+import rollup from 'gulp-rollup'
 import standard from 'gulp-standard'
 import uglify from 'gulp-uglify'
 import notify from 'gulp-notify'
@@ -111,9 +114,20 @@ task('standard', series('standard:gulpfile', 'standard:js', cb => cb()))
  * Concatenates, minifies and renames the source JS files for dist/dev
  */
 task('scripts', () => {
-  return src(`${_srcDir}/js/*.js`)
+  return src(`${_srcDir}/js/index.js`)
     .pipe(plumber({ errorHandler: errorAlert }))
-    .pipe(babel())
+    .pipe(rollup({
+      allowRealFiles: true,
+      input: `${_srcDir}/js/index.js`,
+      plugins: [
+        common(),
+        resolve(),
+        babel()
+      ],
+      output: {
+        format: 'iife'
+      }
+    }))
     .pipe(gulpif(PROD, uglify()))
     .pipe(gulpif(PROD, rename({ suffix: '.min' })))
     .pipe(dest(_buildDir))
