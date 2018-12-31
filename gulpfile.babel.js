@@ -1,13 +1,9 @@
 import { dest, series, src, task, watch } from 'gulp'
 import yargs from 'yargs'
 import del from 'del'
-import babel from 'rollup-plugin-babel'
-import resolve from 'rollup-plugin-node-resolve'
-import common from 'rollup-plugin-commonjs'
+import webpack from 'webpack-stream'
 import gulpif from 'gulp-if'
-import rollup from 'gulp-rollup'
 import standard from 'gulp-standard'
-import uglify from 'gulp-uglify'
 import notify from 'gulp-notify'
 import plumber from 'gulp-plumber'
 import rename from 'gulp-rename'
@@ -116,26 +112,34 @@ task('standard', series('standard:gulpfile', 'standard:js', cb => cb()))
 task('scripts', () => {
   return src(`${_srcDir}/js/index.js`)
     .pipe(plumber({ errorHandler: errorAlert }))
-    .pipe(rollup({
-      allowRealFiles: true,
-      input: `${_srcDir}/js/index.js`,
-      plugins: [
-        common(),
-        resolve(),
-        babel()
-      ],
+    .pipe(webpack({
+      entry: `${_srcDir}/js/index.js`,
       output: {
-        format: 'iife'
+        filename: `index.js`
+      },
+      mode: PROD ? 'production' : 'development',
+      module: {
+        rules: [
+          {
+            test: /\.js$/,
+            exclude: /node_modules/,
+            use: {
+              loader: 'babel-loader',
+              options: {
+                cacheDirectory: true
+              }
+            }
+          }
+        ]
       }
     }))
-    .pipe(gulpif(PROD, uglify()))
     .pipe(gulpif(PROD, rename({ suffix: '.min' })))
     .pipe(dest(_buildDir))
     .pipe(reload({ stream: true }))
     .on('error', errorAlert)
     .pipe(
       notify({
-        message: `${PROD ? 'Prod' : 'Dev'} scripts have been transpiled${PROD ? ', uglified, and minified' : ''}`,
+        message: `${PROD ? 'Prod' : 'Dev'} scripts have been transpiled${PROD ? ' and minified' : ''}`,
         onLast: true
       })
     )
