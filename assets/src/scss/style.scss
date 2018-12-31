@@ -2,5 +2,7 @@ $red: #B71C1C;
 
 body {
 	color: $red;
-	border-color: $red;
+	display: grid;
+	transform: rotate(30deg);
+	margin: 1rem;
 }

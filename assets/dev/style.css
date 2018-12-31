@@ -1,0 +1,9 @@
+/* line 3, assets/src/scss/style.scss */
+body {
+  display: -ms-grid;
+  display: grid;
+  margin: 1rem;
+  -webkit-transform: rotate(30deg);
+          transform: rotate(30deg);
+  color: #B71C1C;
+}

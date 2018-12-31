@@ -4,17 +4,18 @@ import glob from 'glob'
 import del from 'del'
 import babel from 'gulp-babel'
 import concat from 'gulp-concat'
+import gulpif from 'gulp-if'
 import standard from 'gulp-standard'
 import uglify from 'gulp-uglify'
 import notify from 'gulp-notify'
 import plumber from 'gulp-plumber'
 import rename from 'gulp-rename'
-import util from 'gulp-util'
 import sass from 'gulp-sass'
 import sassLint from 'gulp-sass-lint'
 import postcss from 'gulp-postcss'
-import prefix from 'autoprefixer'
+import autoprefixer from 'autoprefixer'
 import cssnano from 'cssnano'
+import cssDeclararationSorter from 'css-declaration-sorter'
 
 let browserSync = require('browser-sync').create()
 let { reload } = browserSync
@@ -28,6 +29,7 @@ const PROD = !(yargs.argv.dev)
  * Set up file paths
  */
 const _assetsDir = './assets'
+const _cleanDir = `${_assetsDir}/**/*`
 const _srcDir = `${_assetsDir}/src`
 const _distDir = `${_assetsDir}/dist`
 const _devDir = `${_assetsDir}/dev`
@@ -37,16 +39,18 @@ const _buildDir = PROD ? _distDir : _devDir
  * Error notification settings
  */
 const errorAlert = err => {
-  notify.onError({
-    message: '<%= error.message %>',
-    sound: 'Sosumi'
-  })(err)
+  let _notifyOpts = {
+    title: 'Gulp <%= error.name %>: <%= error.plugin %>',
+    message: '<%= error.stack %>',
+    sound: 'Basso'
+  }
+  notify.onError(_notifyOpts)(err)
 }
 
 /**
  * Clean the dist/dev directories
  */
-task('clean', () => del(`${_buildDir}/**/*`))
+task('clean', () => del(_cleanDir))
 
 /**
  * Lints the gulpfile for errors
@@ -100,16 +104,16 @@ task('lint', series('lint:gulpfile', 'lint:src', 'lint:sass', cb => cb()))
  */
 task('scripts', () => {
   return src(`${_srcDir}/js/*.js`)
-  .pipe(plumber({ errorHandler: errorAlert }))
+  .pipe(plumber({errorHandler: errorAlert}))
   .pipe(babel())
-  .pipe(PROD ? uglify() : util.noop())
-  .pipe(PROD ? rename({ suffix: '.min' }) : util.noop())
+  .pipe(gulpif(PROD, uglify()))
+  .pipe(gulpif(PROD, rename({ suffix: '.min' })))
   .pipe(dest(_buildDir))
   .pipe(reload({ stream: true }))
   .on('error', errorAlert)
   .pipe(
     notify({
-      message: `${PROD ? 'Scripts' : 'Dev scripts'} have been compiled and minified`,
+      message: `${PROD ? 'Prod' : 'Dev'} scripts have been transpiled${PROD ? ', uglified, and minified' : ''}`,
       onLast: true
     })
   )
@@ -120,12 +124,13 @@ task('scripts', () => {
  */
 task('styles', () => {
   const _sassOpts = {
-    outputStyle: PROD ? 'compressed' : 'expanded',
+    outputStyle: 'expanded',
     sourceComments: !PROD
   }
 
   const _postcssOpts = [
-    prefix({ browsers: ['last 3 versions'] })
+    cssDeclararationSorter({order:'smacss'}),
+    autoprefixer({ grid: true })
   ]
 
   if (PROD) _postcssOpts.push(cssnano())
@@ -133,23 +138,14 @@ task('styles', () => {
   return src(`${_srcDir}/scss/style.scss`)
     .pipe(plumber({ errorHandler: errorAlert }))
     .pipe(sass(_sassOpts))
-    .on('error', function (err) {
-      new util.PluginError(
-        'CSS',
-        err,
-        {
-          showStack: true
-        }
-      )
-    })
-    .pipe(PROD ? rename({ suffix: '.min' }) : util.noop())
+    .pipe(gulpif(PROD, rename({ suffix: '.min' })))
     .pipe(postcss(_postcssOpts))
     .pipe(dest(_buildDir))
     .pipe(reload({ stream: true }))
     .on('error', errorAlert)
     .pipe(
       notify({
-        message: `${PROD ? 'Styles' : 'Dev styles'} have been compiled and minified`,
+        message: `${PROD ? 'Prod' : 'Dev'} styles have been compiled${PROD ? ' and minified' : ''}`,
         onLast: true
       })
     )
@@ -158,7 +154,7 @@ task('styles', () => {
 /**
  * Builds for distribution (staging or production)
  */
-task('build', series('clean', 'styles', cb => cb()))
+task('build', series('clean', 'styles', 'scripts', cb => cb()))
 
 /**
  * Builds assets and reloads the page when any php, html, img or dev files change
